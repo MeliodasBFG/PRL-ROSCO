@@ -155,7 +155,7 @@ export const PresenterScreen: React.FC = () => {
   return (
     <div
       data-testid="presenter-screen"
-      className="min-h-screen bg-gradient-to-b from-studio-900 via-studio-950 to-black text-white flex flex-col"
+      className="min-h-[100dvh] bg-gradient-to-b from-studio-900 via-studio-950 to-black text-white flex flex-col overflow-x-hidden"
     >
       {/* CABECERA EXCLUSIVA DEL PRESENTADOR */}
       <header className="px-4 py-2.5 bg-studio-950/95 border-b border-amber-400/35 flex flex-wrap items-center justify-between gap-2 z-30">
@@ -231,37 +231,28 @@ export const PresenterScreen: React.FC = () => {
       )}
 
       {/* CUERPO PRINCIPAL DE LA CABINA DEL PRESENTADOR */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-2.5 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-w-0">
         {/* ZONA 1 (Izquierda / Centro): ESCENARIO 3D + TARJETA DE PREGUNTA + 3 BOTONES GRANDES */}
-        <div className="lg:col-span-7 flex flex-col gap-3">
-          {/* Escenario 3D del Plató con HUD de Cronómetro y Marcadores */}
-          <div className="relative rounded-2xl overflow-hidden border-2 border-blue-400/45 shadow-studio-glow h-[360px] sm:h-[430px]">
-            <TVStudioStage3D
-              activeContestant={activeContestant}
-              activeLetter={activeLetter}
-              characterAnimation={publicState.characterAnimation}
-              cameraShot={publicState.cameraShot}
-              isGameFinished={publicState.status === 'FINISHED'}
-              allContestants={publicState.contestants}
-              leaderboard={publicState.leaderboard}
-              force2DFallback={force2DStage}
-            />
-
-            {/* Esquina superior izquierda: Información del concursante activo */}
-            <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2">
-              <div className="px-3.5 py-1.5 rounded-xl bg-studio-950/90 border border-blue-400/45 backdrop-blur-md flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-xs font-bold uppercase text-blue-200">EN PLATÓ:</span>
+        <div className="lg:col-span-7 min-w-0 flex flex-col gap-3">
+          {/* Tarjeta del Plató 3D: barra superior fuera del canvas para no tapar letras + escenario 3D responsive */}
+          <div className="rounded-2xl overflow-hidden border-2 border-blue-400/45 shadow-studio-glow flex flex-col bg-studio-950">
+            {/* Barra superior de estado del concursante activo (fuera del área 3D del rosco) */}
+            <div className="px-3 py-2 bg-studio-950/95 border-b border-blue-400/25 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <span className="text-[11px] sm:text-xs font-bold uppercase text-blue-200 shrink-0">
+                  EN PLATÓ:
+                </span>
                 <span
                   data-testid="active-contestant-name"
-                  className="font-display font-black text-sm sm:text-base text-white"
+                  className="font-display font-black text-sm sm:text-base text-white truncate"
                 >
                   {activeContestant?.name || 'Ninguno'}
                 </span>
               </div>
 
               {activeContestant && (
-                <div className="px-3 py-1.5 rounded-xl bg-studio-950/90 border border-blue-400/35 backdrop-blur-md flex items-center gap-3 text-xs font-bold">
+                <div className="flex flex-wrap items-center gap-2.5 text-xs font-bold">
                   <span className="text-amber-300">
                     {activeContestant.score.totalPoints} PTS
                   </span>
@@ -278,39 +269,64 @@ export const PresenterScreen: React.FC = () => {
               )}
             </div>
 
-            {/* Esquina inferior izquierda: Cronómetro circular naranja + Contador verde (como en la foto) */}
-            {activeContestant && (
-              <div className="absolute bottom-3 left-3">
-                <BroadcastTimerBadge
-                  remainingMs={displayRemainingMs}
-                  initialMs={activeContestant.timer.initialMs}
-                  correctCount={activeContestant.score.correctCount}
-                  isRunning={activeContestant.timer.isRunning && publicState.status === 'PLAYING'}
-                  playerName={activeContestant.name}
-                />
-              </div>
-            )}
-
-            {/* Esquina inferior derecha: Letra activa gigante */}
-            {activeLetter && (
-              <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                <div
-                  data-testid="active-letter-badge"
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-b from-blue-400 to-blue-700 border-4 border-white shadow-rosco-blue flex flex-col items-center justify-center"
-                >
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-blue-100">
-                    LETRA
-                  </span>
-                  <span className="font-display font-black text-2xl sm:text-3xl leading-none text-white">
-                    {activeLetter}
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* Contenedor adaptable del Escenario 3D + HUD inteligente anti-solapamiento */}
+            <TVStudioStage3D
+              activeContestant={activeContestant}
+              activeLetter={activeLetter}
+              characterAnimation={publicState.characterAnimation}
+              cameraShot={publicState.cameraShot}
+              isGameFinished={publicState.status === 'FINISHED'}
+              allContestants={publicState.contestants}
+              leaderboard={publicState.leaderboard}
+              force2DFallback={force2DStage}
+              stageHeightClassName="h-[clamp(220px,45dvh,540px)]"
+              hudTimer={
+                activeContestant ? (
+                  <BroadcastTimerBadge
+                    remainingMs={displayRemainingMs}
+                    initialMs={activeContestant.timer.initialMs}
+                    correctCount={activeContestant.score.correctCount}
+                    isRunning={
+                      activeContestant.timer.isRunning && publicState.status === 'PLAYING'
+                    }
+                    playerName={activeContestant.name}
+                  />
+                ) : null
+              }
+              hudCompactTimer={
+                activeContestant ? (
+                  <BroadcastTimerBadge
+                    remainingMs={displayRemainingMs}
+                    initialMs={activeContestant.timer.initialMs}
+                    correctCount={activeContestant.score.correctCount}
+                    isRunning={
+                      activeContestant.timer.isRunning && publicState.status === 'PLAYING'
+                    }
+                    playerName={activeContestant.name}
+                    compact={true}
+                  />
+                ) : null
+              }
+              hudLetter={
+                activeLetter ? (
+                  <div
+                    data-testid="active-letter-badge"
+                    className="w-13 h-13 sm:w-16 sm:h-16 px-3 py-2 rounded-full bg-gradient-to-b from-blue-400 to-blue-700 border-[3px] sm:border-4 border-white shadow-rosco-blue flex flex-col items-center justify-center"
+                  >
+                    <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-blue-100">
+                      LETRA
+                    </span>
+                    <span className="font-display font-black text-xl sm:text-2xl leading-none text-white">
+                      {activeLetter}
+                    </span>
+                  </div>
+                ) : null
+              }
+            />
           </div>
 
           {/* TARJETA DE PREGUNTA ACTIVA PARA LEER EN VOZ ALTA */}
-          <div className="p-4 rounded-2xl bg-studio-900/95 border-2 border-blue-400/40 shadow-xl space-y-2">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-studio-900/95 border-2 border-blue-400/40 shadow-xl space-y-2">
             {activeQuestionPublic ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -331,7 +347,7 @@ export const PresenterScreen: React.FC = () => {
 
                 <p
                   data-testid="active-question-statement"
-                  className="text-base sm:text-xl font-bold text-white leading-snug pt-1"
+                  className="text-base sm:text-lg xl:text-xl font-bold text-white leading-snug pt-0.5"
                 >
                   {activeQuestionPublic.statement}
                 </p>
@@ -348,7 +364,7 @@ export const PresenterScreen: React.FC = () => {
           {/* ZONA DE CONTROL DE RESPUESTAS: 3 BOTONES GRANDES EXCLUSIVOS DEL PRESENTADOR */}
           <div
             data-testid="presenter-answer-controls"
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3"
           >
             {/* BOTÓN VERDE: ACIERTO */}
             <button
@@ -356,13 +372,13 @@ export const PresenterScreen: React.FC = () => {
               data-testid="btn-mark-correct"
               disabled={!canAnswer}
               onClick={handleMarkCorrect}
-              className={`py-4 px-5 rounded-2xl font-display font-black text-lg sm:text-xl tracking-wide flex items-center justify-center gap-2.5 border-2 transition ${
+              className={`py-3 sm:py-3.5 px-4 rounded-2xl font-display font-black text-base sm:text-lg xl:text-xl tracking-wide flex items-center justify-center gap-2 border-2 transition ${
                 canAnswer
                   ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 hover:from-emerald-300 hover:to-emerald-500 border-emerald-200 text-white shadow-rosco-green cursor-pointer active:scale-98'
                   : 'bg-slate-800/70 border-slate-700 text-slate-500 cursor-not-allowed'
               }`}
             >
-              <CheckCircle2 className="w-7 h-7" />
+              <CheckCircle2 className="w-6 h-6 shrink-0" />
               ACIERTO (+{publicState.config.pointsCorrect})
             </button>
 
@@ -372,13 +388,13 @@ export const PresenterScreen: React.FC = () => {
               data-testid="btn-mark-incorrect"
               disabled={!canAnswer}
               onClick={handleMarkIncorrect}
-              className={`py-4 px-5 rounded-2xl font-display font-black text-lg sm:text-xl tracking-wide flex items-center justify-center gap-2.5 border-2 transition ${
+              className={`py-3 sm:py-3.5 px-4 rounded-2xl font-display font-black text-base sm:text-lg xl:text-xl tracking-wide flex items-center justify-center gap-2 border-2 transition ${
                 canAnswer
                   ? 'bg-gradient-to-b from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 border-red-200 text-white shadow-rosco-red cursor-pointer active:scale-98'
                   : 'bg-slate-800/70 border-slate-700 text-slate-500 cursor-not-allowed'
               }`}
             >
-              <XCircle className="w-7 h-7" />
+              <XCircle className="w-6 h-6 shrink-0" />
               FALLO
             </button>
 
@@ -388,20 +404,20 @@ export const PresenterScreen: React.FC = () => {
               data-testid="btn-register-pasapalabra"
               disabled={!canAnswer}
               onClick={handleRegisterPasapalabra}
-              className={`py-4 px-5 rounded-2xl font-display font-black text-lg sm:text-xl tracking-wide flex items-center justify-center gap-2.5 border-2 transition ${
+              className={`py-3 sm:py-3.5 px-4 rounded-2xl font-display font-black text-base sm:text-lg xl:text-xl tracking-wide flex items-center justify-center gap-2 border-2 transition ${
                 canAnswer
                   ? 'bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 border-blue-200 text-white shadow-rosco-blue cursor-pointer active:scale-98'
                   : 'bg-slate-800/70 border-slate-700 text-slate-500 cursor-not-allowed'
               }`}
             >
-              <FastForward className="w-7 h-7" />
+              <FastForward className="w-6 h-6 shrink-0" />
               PASAPALABRA
             </button>
           </div>
         </div>
 
         {/* ZONA 2 (Derecha): INFORMACIÓN PRIVADA DEL PRESENTADOR + GESTIÓN DE TURNOS Y CRONÓMETRO */}
-        <div className="lg:col-span-5 flex flex-col gap-3">
+        <div className="lg:col-span-5 min-w-0 flex flex-col gap-3">
           {/* PANEL ESPECIAL DE DECISIÓN DE PASAPALABRA (Sección 6) */}
           {publicState.awaitingPasapalabraDecision && activeContestant && (
             <div

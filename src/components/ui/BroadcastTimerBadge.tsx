@@ -6,6 +6,7 @@ interface BroadcastTimerBadgeProps {
   correctCount: number;
   isRunning: boolean;
   playerName?: string;
+  compact?: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ export const BroadcastTimerBadge: React.FC<BroadcastTimerBadgeProps> = ({
   correctCount,
   isRunning,
   playerName,
+  compact = false,
 }) => {
   const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const pct = Math.max(0, Math.min(1, remainingMs / Math.max(1000, initialMs)));
@@ -33,7 +35,11 @@ export const BroadcastTimerBadge: React.FC<BroadcastTimerBadgeProps> = ({
       className="flex items-center gap-2 sm:gap-3 select-none"
     >
       {/* Círculo grande naranja de cuenta atrás con anillo blanco */}
-      <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center drop-shadow-[0_6px_20px_rgba(0,0,0,0.65)]">
+      <div
+        className={`relative flex items-center justify-center drop-shadow-[0_6px_20px_rgba(0,0,0,0.65)] ${
+          compact ? 'w-14 h-14 sm:w-16 sm:h-16' : 'w-16 h-16 sm:w-20 sm:h-20'
+        }`}
+      >
         <svg className="w-full h-full -rotate-90" viewBox="0 0 92 92">
           {/* Anillo de fondo */}
           <circle
@@ -68,13 +74,13 @@ export const BroadcastTimerBadge: React.FC<BroadcastTimerBadgeProps> = ({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
             data-testid="active-timer-seconds"
-            className={`font-display font-black text-2xl sm:text-3xl leading-none text-white drop-shadow ${
-              isLowTime && isRunning ? 'animate-pulse' : ''
-            }`}
+            className={`font-display font-black leading-none text-white drop-shadow ${
+              compact ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'
+            } ${isLowTime && isRunning ? 'animate-pulse' : ''}`}
           >
             {seconds}
           </span>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-orange-100 mt-0.5">
+          <span className="text-[8px] font-bold uppercase tracking-wider text-orange-100 mt-0.5">
             {isRunning ? 'EN CURSO' : seconds === 0 ? 'AGOTADO' : 'PAUSA'}
           </span>
         </div>
@@ -85,16 +91,22 @@ export const BroadcastTimerBadge: React.FC<BroadcastTimerBadgeProps> = ({
         <div
           data-testid="active-correct-counter"
           title="Número de aciertos en el rosco"
-          className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 border-[3px] border-white shadow-rosco-green flex flex-col items-center justify-center px-3 py-2"
+          className={`rounded-full bg-gradient-to-b from-emerald-400 to-emerald-600 border-[3px] border-white shadow-rosco-green flex flex-col items-center justify-center ${
+            compact ? 'px-2.5 py-1 min-w-[44px]' : 'px-3 py-1.5 min-w-[52px]'
+          }`}
         >
-          <span className="font-display font-black text-xl sm:text-2xl leading-none text-white drop-shadow">
+          <span
+            className={`font-display font-black leading-none text-white drop-shadow ${
+              compact ? 'text-base sm:text-lg' : 'text-lg sm:text-xl'
+            }`}
+          >
             {correctCount}
           </span>
-          <span className="text-[8px] font-bold uppercase tracking-tighter text-emerald-100">
+          <span className="text-[7px] font-bold uppercase tracking-tighter text-emerald-100">
             ACIERTOS
           </span>
         </div>
-        {playerName && (
+        {playerName && !compact && (
           <span className="px-2.5 py-0.5 rounded-full bg-studio-900/90 border border-blue-400/40 text-[11px] font-bold text-blue-100 truncate max-w-[130px]">
             {playerName}
           </span>

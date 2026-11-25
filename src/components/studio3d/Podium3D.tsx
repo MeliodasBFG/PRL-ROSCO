@@ -100,8 +100,18 @@ export const Podium3D: React.FC<Podium3DProps> = ({ contestants, leaderboard }) 
   ];
 
   return (
-    <group position={[0, -0.7, 0]}>
+    <group position={[0, -0.55, 0]}>
       <ConfettiParticles3D />
+
+      {/* Plataforma circular luminosa del podio */}
+      <mesh position={[0, -1.46, 0]} receiveShadow>
+        <cylinderGeometry args={[3.15, 3.35, 0.2, 48]} />
+        <meshStandardMaterial color="#06236e" roughness={0.3} metalness={0.5} />
+      </mesh>
+      <mesh position={[0, -1.35, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[3.15, 0.03, 12, 64]} />
+        <meshBasicMaterial color="#60a5fa" />
+      </mesh>
 
       {slots.map((slot) => {
         const entry = podiumEntries.find((e) => e.rank === slot.rank);

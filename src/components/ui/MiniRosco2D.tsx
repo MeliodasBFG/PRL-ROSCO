@@ -25,13 +25,13 @@ export const MiniRosco2D: React.FC<MiniRosco2DProps> = ({
 }) => {
   const total = ROSCO_LETTERS.length; // 27 letras exactas
   const radiusPct = 42.5;
-  const dotSize = size < 130 ? 13 : 16;
+  const dotSize = size >= 180 ? 17 : size < 130 ? 13 : 15;
 
   return (
     <div
       data-testid="mini-rosco-27"
       style={{ width: size, height: size }}
-      className="relative flex items-center justify-center select-none shrink-0"
+      className="relative max-w-full flex items-center justify-center select-none shrink-0"
     >
       {/* Círculo guía interior */}
       <div className="w-[82%] h-[82%] rounded-full border border-blue-400/25 bg-studio-900/50 flex items-center justify-center">

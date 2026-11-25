@@ -214,8 +214,8 @@ export const RoscoWheel3D: React.FC<RoscoWheel3DProps> = ({
   letters,
   activeLetter,
   isRoscoCompleteGold = false,
-  radius = 2.18,
-  centerY = 0.28,
+  radius = 2.15,
+  centerY = 0,
 }) => {
   const nodes = useMemo(() => {
     const total = ROSCO_LETTERS.length; // 27 letras exactas

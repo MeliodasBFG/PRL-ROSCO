@@ -126,7 +126,7 @@ export const WelcomeAndLobbyScreen: React.FC = () => {
     const isHost = role === 'HOST';
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-studio-900 via-studio-950 to-black text-white flex flex-col">
+      <div className="min-h-[100dvh] bg-gradient-to-b from-studio-900 via-studio-950 to-black text-white flex flex-col overflow-x-hidden">
         {/* Barra superior de Sala de Espera */}
         <header className="px-4 sm:px-6 py-3 bg-studio-950/90 border-b border-blue-400/30 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -170,20 +170,22 @@ export const WelcomeAndLobbyScreen: React.FC = () => {
           </div>
         )}
 
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start min-w-0">
           {/* Columna izquierda: Escenario 3D en vivo + Código QR */}
-          <div className="lg:col-span-5 space-y-4">
+          <div className="lg:col-span-5 min-w-0 space-y-4">
             <QrCodeInviteCard roomCode={roomCode} />
 
-            <div className="rounded-2xl overflow-hidden border-2 border-blue-400/40 shadow-studio-glow h-[340px] sm:h-[380px] relative">
-              <TVStudioStage3D
-                activeContestant={contestants[0] ?? null}
-                activeLetter="A"
-                characterAnimation="WAIT"
-                cameraShot="CONTESTANT_ENTRY"
-                force2DFallback={force2DStage}
-              />
-              <div className="absolute bottom-3 inset-x-3 px-3.5 py-2 rounded-xl bg-studio-950/85 border border-blue-400/30 backdrop-blur-md flex items-center justify-between text-xs">
+            <div className="rounded-2xl overflow-hidden border-2 border-blue-400/40 shadow-studio-glow flex flex-col bg-studio-950">
+              <div className="w-full h-[clamp(240px,42dvh,420px)] min-h-0">
+                <TVStudioStage3D
+                  activeContestant={contestants[0] ?? null}
+                  activeLetter="A"
+                  characterAnimation="WAIT"
+                  cameraShot="CONTESTANT_ENTRY"
+                  force2DFallback={force2DStage}
+                />
+              </div>
+              <div className="px-3.5 py-2 bg-studio-950/95 border-t border-blue-400/30 flex items-center justify-between text-xs shrink-0">
                 <span className="text-blue-200 font-semibold flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   Plató 3D preparado · 27 Letras (A-Z, Ñ)
@@ -196,7 +198,7 @@ export const WelcomeAndLobbyScreen: React.FC = () => {
           </div>
 
           {/* Columna derecha: Lista de los 15 concursantes y controles de inicio */}
-          <div className="lg:col-span-7 p-5 rounded-2xl bg-studio-900/85 border border-blue-400/35 shadow-2xl space-y-5">
+          <div className="lg:col-span-7 min-w-0 p-4 sm:p-5 rounded-2xl bg-studio-900/85 border border-blue-400/35 shadow-2xl space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-400/20 pb-3">
               <div>
                 <h2 className="font-display font-black text-lg sm:text-xl text-white flex items-center gap-2">
@@ -333,7 +335,7 @@ export const WelcomeAndLobbyScreen: React.FC = () => {
   // VISTA 1: PANTALLA INICIAL DE BIENVENIDA (ENTRAR A SALA O CREAR SALA)
   // ==========================================================================
   return (
-    <div className="min-h-screen bg-gradient-to-b from-studio-800 via-studio-950 to-black text-white flex flex-col">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-studio-800 via-studio-950 to-black text-white flex flex-col overflow-x-hidden">
       {/* Cabecera de bienvenida */}
       <header className="px-4 sm:px-8 py-4 border-b border-blue-400/25 bg-studio-950/75 backdrop-blur-md flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -367,55 +369,58 @@ export const WelcomeAndLobbyScreen: React.FC = () => {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center min-w-0">
         {/* Vista previa en directo del Escenario 3D y el Avatar configurable */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="rounded-3xl overflow-hidden border-2 border-blue-400/50 shadow-studio-glow h-[380px] sm:h-[470px] relative">
-            <TVStudioStage3D
-              activeContestant={{
-                id: 'preview',
-                name: playerNameInput.trim() || 'JAVIER',
-                avatar: selectedAvatar,
-                turnOrder: 1,
-                status: 'ACTIVE',
-                isConnected: true,
-                currentLetter: 'A',
-                lapCount: 1,
-                letters: {} as any,
-                timer: {
-                  playerId: 'preview',
-                  initialMs: 120000,
-                  remainingMs: 120000,
-                  consumedMs: 0,
-                  isRunning: false,
-                  lastServerSyncAt: Date.now(),
-                },
-                score: {
-                  playerId: 'preview',
-                  correctCount: 22,
-                  incorrectCount: 0,
-                  pasapalabraCount: 0,
-                  pendingCount: 5,
-                  totalPoints: 220,
-                  timeConsumedMs: 0,
-                  timeRemainingMs: 120000,
-                  accuracyPct: 100,
-                  rankPosition: 1,
-                },
-              }}
-              activeLetter="A"
-              characterAnimation="CONCENTRATION"
-              cameraShot="ACTIVE_QUESTION"
-              force2DFallback={force2DStage}
-            />
-            <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-studio-950/85 border border-blue-400/40 text-[11px] font-bold text-blue-200">
-              PLATÓ 3D EN TIEMPO REAL · 27 LETRAS (A-Z, Ñ)
+        <div className="lg:col-span-6 min-w-0 space-y-4">
+          <div className="rounded-3xl overflow-hidden border-2 border-blue-400/50 shadow-studio-glow flex flex-col bg-studio-950">
+            <div className="px-3.5 py-2 bg-studio-950/95 border-b border-blue-400/25 flex items-center justify-between text-[11px] font-bold text-blue-200 shrink-0">
+              <span>PLATÓ 3D EN TIEMPO REAL · 27 LETRAS (A-Z, Ñ)</span>
+              <span className="text-emerald-300">VISTA PREVIA</span>
+            </div>
+            <div className="w-full h-[clamp(240px,46dvh,470px)] min-h-0">
+              <TVStudioStage3D
+                activeContestant={{
+                  id: 'preview',
+                  name: playerNameInput.trim() || 'JAVIER',
+                  avatar: selectedAvatar,
+                  turnOrder: 1,
+                  status: 'ACTIVE',
+                  isConnected: true,
+                  currentLetter: 'A',
+                  lapCount: 1,
+                  letters: {} as any,
+                  timer: {
+                    playerId: 'preview',
+                    initialMs: 120000,
+                    remainingMs: 120000,
+                    consumedMs: 0,
+                    isRunning: false,
+                    lastServerSyncAt: Date.now(),
+                  },
+                  score: {
+                    playerId: 'preview',
+                    correctCount: 22,
+                    incorrectCount: 0,
+                    pasapalabraCount: 0,
+                    pendingCount: 5,
+                    totalPoints: 220,
+                    timeConsumedMs: 0,
+                    timeRemainingMs: 120000,
+                    accuracyPct: 100,
+                    rankPosition: 1,
+                  },
+                }}
+                activeLetter="A"
+                characterAnimation="CONCENTRATION"
+                cameraShot="ACTIVE_QUESTION"
+                force2DFallback={force2DStage}
+              />
             </div>
           </div>
         </div>
 
         {/* Tarjeta de Acceso: Concursante o Presentador (Profesor) */}
-        <div className="lg:col-span-6 p-6 sm:p-7 rounded-3xl bg-studio-900/90 border-2 border-blue-400/35 shadow-2xl space-y-6">
+        <div className="lg:col-span-6 min-w-0 p-5 sm:p-7 rounded-3xl bg-studio-900/90 border-2 border-blue-400/35 shadow-2xl space-y-6">
           {/* Selector de Rol */}
           <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-studio-950 border border-blue-400/25">
             <button

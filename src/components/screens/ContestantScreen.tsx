@@ -61,7 +61,7 @@ export const ContestantScreen: React.FC = () => {
   return (
     <div
       data-testid="contestant-screen"
-      className="min-h-screen bg-gradient-to-b from-studio-800 via-studio-950 to-black text-white flex flex-col"
+      className="min-h-[100dvh] bg-gradient-to-b from-studio-800 via-studio-950 to-black text-white flex flex-col overflow-x-hidden"
     >
       {/* CABECERA DEL CONCURSANTE */}
       <header className="px-4 py-2.5 bg-studio-950/90 border-b border-blue-400/30 flex flex-wrap items-center justify-between gap-2 z-30">
@@ -70,7 +70,7 @@ export const ContestantScreen: React.FC = () => {
             <Tv className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span className="font-display font-black text-base sm:text-lg text-white">
                 PRL-ROSCO 3D
               </span>
@@ -81,7 +81,7 @@ export const ContestantScreen: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {(publicState.config.showLeaderboardDuringGame ||
             publicState.status === 'FINISHED') && (
             <button
@@ -113,43 +113,39 @@ export const ContestantScreen: React.FC = () => {
       </header>
 
       {/* ZONA PRINCIPAL: ESCENARIO 3D + PREGUNTA + MI PANEL PERSONAL */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* ZONA DE PLATÓ 3D Y TARJETA DE PREGUNTA (8 columnas) */}
-        <div className="lg:col-span-8 flex flex-col gap-4">
-          {/* Escenario 3D sincronizado en tiempo real */}
-          <div className="relative rounded-3xl overflow-hidden border-2 border-blue-400/50 shadow-studio-glow h-[380px] sm:h-[470px]">
-            <TVStudioStage3D
-              activeContestant={activeContestant}
-              activeLetter={activeLetter}
-              characterAnimation={publicState.characterAnimation}
-              cameraShot={publicState.cameraShot}
-              isGameFinished={publicState.status === 'FINISHED'}
-              allContestants={publicState.contestants}
-              leaderboard={publicState.leaderboard}
-              force2DFallback={force2DStage}
-            />
-
-            {/* Indicador superior de quién tiene el turno en el centro del plató */}
-            <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-2.5 sm:p-4 lg:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start min-w-0">
+        {/* ZONA DE PLATÓ 3D Y TARJETA DE PREGUNTA (8 columnas en escritorio, prioritaria arriba en móvil) */}
+        <div className="lg:col-span-8 min-w-0 flex flex-col gap-3 sm:gap-4">
+          {/* Tarjeta del Plató 3D: barra superior fuera del canvas + rosco completo 100% encuadrado */}
+          <div className="rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-blue-400/50 shadow-studio-glow flex flex-col bg-studio-950">
+            {/* Barra superior de turno activo (siempre legible y fuera del área circular del rosco) */}
+            <div className="px-3 py-2 bg-studio-950/95 border-b border-blue-400/25 flex flex-wrap items-center justify-between gap-2 shrink-0">
               <div
-                className={`px-4 py-1.5 rounded-2xl border backdrop-blur-md flex items-center gap-2 shadow-lg ${
+                className={`px-3 py-1 rounded-xl border flex items-center gap-1.5 min-w-0 ${
                   isMyTurn
-                    ? 'bg-emerald-600/90 border-white text-white'
-                    : 'bg-studio-950/90 border-blue-400/45 text-white'
+                    ? 'bg-emerald-600/90 border-emerald-200 text-white'
+                    : 'bg-studio-900 border-blue-400/40 text-white'
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span className="font-display font-black text-xs sm:text-sm">
-                  {isMyTurn
-                    ? '¡ESTÁS JUGANDO EN EL CENTRO DEL PLATÓ! RESPONDE EN VOZ ALTA'
-                    : activeContestant
-                    ? `JUGANDO AHORA: ${activeContestant.name.toUpperCase()}`
-                    : 'ESPERANDO INICIO DE TURNO'}
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span className="font-display font-black text-[11px] sm:text-xs">
+                  {isMyTurn ? (
+                    <>
+                      <span className="sm:hidden">¡TU TURNO EN PLATÓ!</span>
+                      <span className="hidden sm:inline">
+                        ¡ESTÁS EN PLATÓ! RESPONDE EN VOZ ALTA
+                      </span>
+                    </>
+                  ) : activeContestant ? (
+                    `JUGANDO: ${activeContestant.name.toUpperCase()}`
+                  ) : (
+                    'ESPERANDO TURNO'
+                  )}
                 </span>
               </div>
 
               {activeContestant && (
-                <div className="px-3.5 py-1.5 rounded-2xl bg-studio-950/90 border border-blue-400/40 backdrop-blur-md text-xs font-bold flex items-center gap-3">
+                <div className="px-2.5 py-1 rounded-xl bg-studio-900 border border-blue-400/30 text-xs font-bold flex items-center gap-2.5 shrink-0">
                   <span className="text-amber-300">
                     {activeContestant.score.totalPoints} pts
                   </span>
@@ -163,44 +159,74 @@ export const ContestantScreen: React.FC = () => {
               )}
             </div>
 
-            {/* Esquina inferior izquierda: Cronómetro grande del concursante activo */}
-            {activeContestant && (
-              <div className="absolute bottom-3 left-3">
-                <BroadcastTimerBadge
-                  remainingMs={displayRemainingMs}
-                  initialMs={activeContestant.timer.initialMs}
-                  correctCount={activeContestant.score.correctCount}
-                  isRunning={activeContestant.timer.isRunning && publicState.status === 'PLAYING'}
-                  playerName={activeContestant.name}
-                />
-              </div>
-            )}
-
-            {/* Esquina inferior derecha: Letra activa */}
-            {activeLetter && (
-              <div className="absolute bottom-3 right-3">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-b from-blue-400 to-blue-700 border-4 border-white shadow-rosco-blue flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-bold uppercase text-blue-100">LETRA</span>
-                  <span className="font-display font-black text-2xl sm:text-3xl leading-none text-white">
-                    {activeLetter}
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* Escenario 3D responsive sin recortes en ordenador, tablet y móvil (vertical/horizontal) */}
+            <TVStudioStage3D
+              activeContestant={activeContestant}
+              activeLetter={activeLetter}
+              characterAnimation={publicState.characterAnimation}
+              cameraShot={publicState.cameraShot}
+              isGameFinished={publicState.status === 'FINISHED'}
+              allContestants={publicState.contestants}
+              leaderboard={publicState.leaderboard}
+              force2DFallback={force2DStage}
+              stageHeightClassName="h-[clamp(220px,43dvh,560px)]"
+              hudTimer={
+                activeContestant ? (
+                  <BroadcastTimerBadge
+                    remainingMs={displayRemainingMs}
+                    initialMs={activeContestant.timer.initialMs}
+                    correctCount={activeContestant.score.correctCount}
+                    isRunning={
+                      activeContestant.timer.isRunning && publicState.status === 'PLAYING'
+                    }
+                    playerName={activeContestant.name}
+                  />
+                ) : null
+              }
+              hudCompactTimer={
+                activeContestant ? (
+                  <BroadcastTimerBadge
+                    remainingMs={displayRemainingMs}
+                    initialMs={activeContestant.timer.initialMs}
+                    correctCount={activeContestant.score.correctCount}
+                    isRunning={
+                      activeContestant.timer.isRunning && publicState.status === 'PLAYING'
+                    }
+                    playerName={activeContestant.name}
+                    compact={true}
+                  />
+                ) : null
+              }
+              hudLetter={
+                activeLetter ? (
+                  <div
+                    data-testid="active-letter-badge"
+                    className="w-13 h-13 sm:w-16 sm:h-16 px-3 py-2 rounded-full bg-gradient-to-b from-blue-400 to-blue-700 border-[3px] sm:border-4 border-white shadow-rosco-blue flex flex-col items-center justify-center"
+                  >
+                    <span className="text-[8px] sm:text-[9px] font-bold uppercase text-blue-100">
+                      LETRA
+                    </span>
+                    <span className="font-display font-black text-xl sm:text-2xl leading-none text-white">
+                      {activeLetter}
+                    </span>
+                  </div>
+                ) : null
+              }
+            />
           </div>
 
           {/* TARJETA GRANDE Y LEGIBLE DE LA PREGUNTA ACTUAL */}
-          <div className="p-5 rounded-3xl bg-studio-900/95 border-2 border-blue-400/45 shadow-2xl space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-studio-900/95 border-2 border-blue-400/45 shadow-2xl space-y-2.5 sm:space-y-3">
             {activeQuestion ? (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="px-3.5 py-1 rounded-xl bg-blue-600 font-display font-black text-xs sm:text-sm text-white shadow-rosco-blue">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-xl bg-blue-600 font-display font-black text-xs sm:text-sm text-white shadow-rosco-blue">
                       {activeQuestion.mode === 'EMPIEZA_POR'
                         ? `EMPIEZA POR LA ${activeQuestion.letter}`
                         : `CONTIENE LA ${activeQuestion.letter}`}
                     </span>
-                    <span className="px-3 py-1 rounded-xl bg-studio-800 border border-blue-400/30 text-xs font-semibold text-blue-200">
+                    <span className="px-2.5 py-1 rounded-xl bg-studio-800 border border-blue-400/30 text-xs font-semibold text-blue-200">
                       {activeQuestion.category}
                     </span>
                   </div>
@@ -214,7 +240,7 @@ export const ContestantScreen: React.FC = () => {
 
                 <p
                   data-testid="contestant-question-statement"
-                  className="text-lg sm:text-2xl font-extrabold text-white leading-snug"
+                  className="text-base sm:text-xl xl:text-2xl font-extrabold text-white leading-snug"
                 >
                   {activeQuestion.statement}
                 </p>
@@ -274,7 +300,7 @@ export const ContestantScreen: React.FC = () => {
         </div>
 
         {/* MI PANEL PERSONAL (4 columnas — Visible en todo momento aunque juegue otro concursante) */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className="lg:col-span-4 min-w-0 space-y-4">
           {myContestant && (
             <div
               data-testid="my-personal-panel"

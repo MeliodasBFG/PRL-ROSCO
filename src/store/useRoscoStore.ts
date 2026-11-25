@@ -49,6 +49,7 @@ interface RoscoClientStore {
   fetchQuestionBank: () => Promise<void>;
   saveQuestionInBank: (question: PRLQuestion) => Promise<boolean>;
   fetchPastResults: () => Promise<void>;
+  restoreSessionFromStorage: () => Promise<void>;
   leaveRoom: () => void;
   tickLocalTimerDisplay: () => void;
 }
@@ -93,11 +94,13 @@ function getWsBaseUrl(): string {
 }
 
 let activeWebSocket: WebSocket | null = null;
+let wsReconnectTimeoutId: number | null = null;
 let pollIntervalId: number | null = null;
 let broadcastChannel: BroadcastChannel | null = null;
 let lastServerSyncPerfNow = 0;
 let baseServerRemainingMs = 0;
 let lastWarningSecondBeeped = -1;
+let wsReconnectAttempts = 0;
 
 function triggerAudioForEvent(event: GameEventType, publicState: RoomPublicState) {
   switch (event) {
@@ -212,38 +215,84 @@ export const useRoscoStore = create<RoscoClientStore>((set, get) => {
       };
     }
 
-    // 2. Intentar conexión WebSocket con Cloudflare Durable Object (RoscoRoomDO)
-    try {
-      if (activeWebSocket) {
-        activeWebSocket.close();
-        activeWebSocket = null;
-      }
-      const wsUrl = `${getWsBaseUrl()}/api/rooms/${encodeURIComponent(
-        roomCode
-      )}/ws?token=${encodeURIComponent(token)}`;
-      const ws = new WebSocket(wsUrl);
-      activeWebSocket = ws;
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data) as ServerToClientMessage;
-          if (msg.type === 'STATE_SYNC') {
-            applyIncomingState(msg.publicState, msg.presenterPrivate, msg.event);
-          } else if (msg.type === 'TIMER_TICK') {
-            baseServerRemainingMs = msg.remainingMs;
-            lastServerSyncPerfNow =
-              typeof performance !== 'undefined' ? performance.now() : Date.now();
-            set({ displayRemainingMs: msg.remainingMs });
-          } else if (msg.type === 'ERROR') {
-            set({ errorMessage: msg.message });
-          }
-        } catch {
-          // Ignorar paquetes malformados
+    // 2. Intentar conexión WebSocket con Cloudflare Durable Object (RoscoRoomDO) y reconexión automática
+    const connectWebSocket = () => {
+      try {
+        if (wsReconnectTimeoutId !== null && typeof window !== 'undefined') {
+          window.clearTimeout(wsReconnectTimeoutId);
+          wsReconnectTimeoutId = null;
         }
-      };
-    } catch {
-      // El sincronizador HTTP autoritativo mantiene la conexión viva
-    }
+        if (activeWebSocket) {
+          activeWebSocket.onclose = null;
+          activeWebSocket.onerror = null;
+          activeWebSocket.close();
+          activeWebSocket = null;
+        }
+        const st = get();
+        if (st.roomCode !== roomCode || st.authToken !== token) return;
+
+        const wsUrl = `${getWsBaseUrl()}/api/rooms/${encodeURIComponent(
+          roomCode
+        )}/ws?token=${encodeURIComponent(token)}`;
+        const ws = new WebSocket(wsUrl);
+        activeWebSocket = ws;
+
+        ws.onopen = () => {
+          wsReconnectAttempts = 0;
+          set({ connectionStatus: 'CONNECTED' });
+          fetchLatestStateFromServer(roomCode, token);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data) as ServerToClientMessage;
+            if (msg.type === 'STATE_SYNC') {
+              applyIncomingState(msg.publicState, msg.presenterPrivate, msg.event);
+            } else if (msg.type === 'TIMER_TICK') {
+              baseServerRemainingMs = msg.remainingMs;
+              lastServerSyncPerfNow =
+                typeof performance !== 'undefined' ? performance.now() : Date.now();
+              set({ displayRemainingMs: msg.remainingMs });
+            } else if (msg.type === 'ERROR') {
+              set({ errorMessage: msg.message });
+            }
+          } catch {
+            // Ignorar paquetes malformados
+          }
+        };
+
+        const scheduleReconnect = () => {
+          if (activeWebSocket !== ws) return;
+          activeWebSocket = null;
+          const cur = get();
+          if (!cur.roomCode || !cur.authToken || cur.roomCode !== roomCode) return;
+          set((s) => ({
+            connectionStatus: s.publicState ? 'RECONNECTING' : 'DISCONNECTED',
+          }));
+          if (typeof window !== 'undefined') {
+            const delayMs = Math.min(5000, 1000 * Math.pow(1.5, wsReconnectAttempts));
+            wsReconnectAttempts += 1;
+            wsReconnectTimeoutId = window.setTimeout(() => {
+              connectWebSocket();
+            }, delayMs);
+          }
+        };
+
+        ws.onclose = scheduleReconnect;
+        ws.onerror = () => {
+          try {
+            ws.close();
+          } catch {
+            scheduleReconnect();
+          }
+        };
+      } catch {
+        // El sincronizador HTTP autoritativo mantiene la conexión viva
+      }
+    };
+
+    wsReconnectAttempts = 0;
+    connectWebSocket();
 
     // 3. Sincronización continua autoritativa con el servidor (reconexión automática garantizada)
     if (pollIntervalId !== null && typeof window !== 'undefined') {
@@ -523,8 +572,64 @@ export const useRoscoStore = create<RoscoClientStore>((set, get) => {
       }
     },
 
+    restoreSessionFromStorage: async () => {
+      if (typeof window === 'undefined') return;
+      if (get().role !== 'NONE' && get().roomCode) return;
+      try {
+        const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as {
+          role: ClientRole;
+          roomCode: string;
+          authToken: string;
+          myPlayerId: string | null;
+        };
+        if (!parsed.roomCode || !parsed.authToken || parsed.role === 'NONE') return;
+
+        set({ connectionStatus: 'RECONNECTING' });
+        const resp = await fetch(
+          `${getApiBaseUrl()}/api/rooms/${encodeURIComponent(parsed.roomCode)}/state`,
+          {
+            headers: { 'X-Auth-Token': parsed.authToken },
+          }
+        );
+        if (!resp.ok) {
+          if (resp.status === 404 || resp.status === 403) {
+            window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+          }
+          set({ connectionStatus: 'DISCONNECTED' });
+          return;
+        }
+        const data = (await resp.json()) as any;
+        if (!data.ok || !data.publicState) {
+          set({ connectionStatus: 'DISCONNECTED' });
+          return;
+        }
+
+        set({
+          role: parsed.role,
+          roomCode: parsed.roomCode,
+          authToken: parsed.authToken,
+          myPlayerId: parsed.myPlayerId,
+          presenterPrivate: parsed.role === 'HOST' ? (data.presenterPrivate ?? null) : null,
+          connectionStatus: 'CONNECTED',
+        });
+
+        applyIncomingState(data.publicState, data.presenterPrivate);
+        setupRealtimeSync(parsed.roomCode, parsed.authToken);
+      } catch {
+        set({ connectionStatus: 'DISCONNECTED' });
+      }
+    },
+
     leaveRoom: () => {
+      if (wsReconnectTimeoutId !== null && typeof window !== 'undefined') {
+        window.clearTimeout(wsReconnectTimeoutId);
+        wsReconnectTimeoutId = null;
+      }
       if (activeWebSocket) {
+        activeWebSocket.onclose = null;
+        activeWebSocket.onerror = null;
         activeWebSocket.close();
         activeWebSocket = null;
       }

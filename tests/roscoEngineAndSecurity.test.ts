@@ -531,5 +531,63 @@ describe('PRL-ROSCO — Pruebas Funcionales Obligatorias (Sección 21)', () => {
       const priv = room.getPresenterPrivateState('htok_host');
       expect(priv.auditLog[0].eventType).toBe('ACTION_UNDONE');
     });
+
+    it('restaura el cronómetro individual usando marcas temporales del servidor tras serialización/deserialización sin duplicar puntos ni acciones', () => {
+      let now = 10_000_000;
+      const room = new AuthoritativeRoscoRoom({
+        roomId: 'room-SNAP',
+        roomCode: 'SNAP01',
+        hostToken: 'htok_snap',
+        config: { timerSeconds: 120 },
+        now,
+      });
+
+      const p1 = room.joinContestant({ name: 'Elena', now });
+      room.executePresenterAction('htok_snap', { type: 'START_GAME', actionId: 'snap-start' }, now);
+
+      now += 12_000; // Pasan 12s -> 108s restantes
+      const qA = room.getPublicState(now).activeQuestion!.id;
+      room.executePresenterAction(
+        'htok_snap',
+        {
+          type: 'MARK_CORRECT',
+          actionId: 'snap-mark-A',
+          expectedPlayerId: p1.playerId,
+          expectedLetter: 'A',
+          expectedQuestionId: qA,
+        },
+        now
+      );
+
+      // Serializar snapshot en t = 10_012_000 (108.000 ms restantes, reloj en marcha)
+      const snapshot = room.serializeSnapshot(now);
+      const restored = AuthoritativeRoscoRoom.fromSnapshot(snapshot);
+
+      // Pasan 8 segundos más en el servidor antes de la siguiente lectura/operación
+      now += 8_000;
+      restored.syncActiveTimer(now);
+
+      const pub = restored.getPublicState(now);
+      const elena = pub.contestants[0];
+      expect(elena.timer.remainingMs).toBe(100_000);
+      expect(elena.timer.consumedMs).toBe(20_000);
+      expect(elena.score.totalPoints).toBe(10);
+      expect(pub.activeLetter).toBe('B');
+
+      // Reintentar la acción ya procesada antes del reinicio -> rechazada por idempotencia
+      expect(() =>
+        restored.executePresenterAction(
+          'htok_snap',
+          {
+            type: 'MARK_CORRECT',
+            actionId: 'snap-mark-A',
+            expectedPlayerId: p1.playerId,
+            expectedLetter: 'A',
+            expectedQuestionId: qA,
+          },
+          now
+        )
+      ).toThrowError(/ya fue procesada/);
+    });
   });
 });

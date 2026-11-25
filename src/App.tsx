@@ -5,7 +5,11 @@ import { PresenterScreen } from './components/screens/PresenterScreen';
 import { ContestantScreen } from './components/screens/ContestantScreen';
 
 export const App: React.FC = () => {
-  const { role, publicState, tickLocalTimerDisplay } = useRoscoStore();
+  const { role, publicState, tickLocalTimerDisplay, restoreSessionFromStorage } = useRoscoStore();
+
+  useEffect(() => {
+    void restoreSessionFromStorage();
+  }, [restoreSessionFromStorage]);
 
   // Interpolador visual suave (100ms) gobernado por el timestamp autoritativo del servidor
   useEffect(() => {

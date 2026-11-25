@@ -82,6 +82,39 @@ export interface PastRoundResult {
   finishedAt: number;
 }
 
+export interface PersistedRoscoRoomSnapshot {
+  schemaVersion: 1;
+  roomId: string;
+  roomCode: string;
+  hostToken: string;
+  playerTokenEntries: Array<[string, string]>;
+  processedActionIds: string[];
+  status: RoomStatus;
+  roundNumber: number;
+  roundStartedAt: number;
+  stateVersion: number;
+  eventSeq: number;
+  hostConnected: boolean;
+  config: RoomConfig;
+  activePlayerId: string | null;
+  activeLetter: RoscoLetter | null;
+  awaitingPasapalabraDecision: boolean;
+  characterAnimation: CharacterAnimationState;
+  cameraShot: CameraShot;
+  revealedAnswerForQuestionId: string | null;
+  revealedExplanationForQuestionId: string | null;
+  contestants: ContestantState[];
+  roundQuestions: Record<RoscoLetter, PRLQuestion>;
+  previouslyUsedQuestionIds: string[];
+  customQuestionBank: PRLQuestion[];
+  auditLog: AuditEvent[];
+  lastUndoSnapshot: UndoSnapshot | null;
+  lastEvent: RoomPublicState['lastEvent'];
+  timerLastTickTimestamp: number;
+  pastResults: PastRoundResult[];
+  savedAt: number;
+}
+
 export class AuthoritativeRoscoRoom {
   public readonly roomId: string;
   public readonly roomCode: string;
@@ -92,6 +125,7 @@ export class AuthoritativeRoscoRoom {
 
   public status: RoomStatus = 'WAITING';
   public roundNumber = 1;
+  public roundStartedAt: number;
   public stateVersion = 1;
   public eventSeq = 0;
   public hostConnected = true;
@@ -124,10 +158,14 @@ export class AuthoritativeRoscoRoom {
     config?: Partial<RoomConfig>;
     questionBank?: PRLQuestion[];
     now?: number;
+    _skipInitialSetup?: boolean;
   }) {
+    const now = params.now ?? Date.now();
     this.roomId = params.roomId;
     this.roomCode = params.roomCode.toUpperCase();
     this.hostToken = params.hostToken;
+    this.roundStartedAt = now;
+    this.timerLastTickTimestamp = now;
     this.customQuestionBank = params.questionBank
       ? [...params.questionBank]
       : [...INITIAL_PRL_QUESTION_BANK];
@@ -144,6 +182,11 @@ export class AuthoritativeRoscoRoom {
       selectedDifficulty: params.config?.selectedDifficulty ?? 'TODAS',
     };
 
+    if (params._skipInitialSetup) {
+      this.roundQuestions = {} as Record<RoscoLetter, PRLQuestion>;
+      return;
+    }
+
     this.roundQuestions = selectRoundQuestions({
       bank: this.customQuestionBank,
       categories: this.config.selectedCategories,
@@ -158,8 +201,130 @@ export class AuthoritativeRoscoRoom {
       null,
       `Sala ${this.roomCode} creada por el presentador`,
       false,
-      params.now
+      now
     );
+  }
+
+  // ==========================================================================
+  // SERIALIZACIÓN Y RESTAURACIÓN COMPLETA DEL ESTADO AUTORITATIVO
+  // ==========================================================================
+
+  public serializeSnapshot(now = Date.now()): PersistedRoscoRoomSnapshot {
+    return {
+      schemaVersion: 1,
+      roomId: this.roomId,
+      roomCode: this.roomCode,
+      hostToken: this.hostToken,
+      playerTokenEntries: Array.from(this.playerTokens.entries()),
+      processedActionIds: Array.from(this.processedActionIds),
+      status: this.status,
+      roundNumber: this.roundNumber,
+      roundStartedAt: this.roundStartedAt,
+      stateVersion: this.stateVersion,
+      eventSeq: this.eventSeq,
+      hostConnected: this.hostConnected,
+      config: JSON.parse(JSON.stringify(this.config)),
+      activePlayerId: this.activePlayerId,
+      activeLetter: this.activeLetter,
+      awaitingPasapalabraDecision: this.awaitingPasapalabraDecision,
+      characterAnimation: this.characterAnimation,
+      cameraShot: this.cameraShot,
+      revealedAnswerForQuestionId: this.revealedAnswerForQuestionId,
+      revealedExplanationForQuestionId: this.revealedExplanationForQuestionId,
+      contestants: JSON.parse(JSON.stringify(Array.from(this.contestants.values()))),
+      roundQuestions: JSON.parse(JSON.stringify(this.roundQuestions)),
+      previouslyUsedQuestionIds: Array.from(this.previouslyUsedQuestionIds),
+      customQuestionBank: JSON.parse(JSON.stringify(this.customQuestionBank)),
+      auditLog: JSON.parse(JSON.stringify(this.auditLog)),
+      lastUndoSnapshot: this.lastUndoSnapshot
+        ? JSON.parse(JSON.stringify(this.lastUndoSnapshot))
+        : null,
+      lastEvent: this.lastEvent ? JSON.parse(JSON.stringify(this.lastEvent)) : null,
+      timerLastTickTimestamp: this.timerLastTickTimestamp,
+      pastResults: JSON.parse(JSON.stringify(this.pastResults)),
+      savedAt: now,
+    };
+  }
+
+  public static fromSnapshot(snapshot: PersistedRoscoRoomSnapshot): AuthoritativeRoscoRoom {
+    const room = new AuthoritativeRoscoRoom({
+      roomId: snapshot.roomId,
+      roomCode: snapshot.roomCode,
+      hostToken: snapshot.hostToken,
+      config: snapshot.config,
+      questionBank: snapshot.customQuestionBank,
+      now: snapshot.roundStartedAt,
+      _skipInitialSetup: true,
+    });
+
+    room.status = snapshot.status;
+    room.roundNumber = snapshot.roundNumber;
+    room.roundStartedAt = snapshot.roundStartedAt ?? snapshot.savedAt ?? Date.now();
+    room.stateVersion = snapshot.stateVersion;
+    room.eventSeq = snapshot.eventSeq;
+    room.hostConnected = snapshot.hostConnected;
+    room.config = JSON.parse(JSON.stringify(snapshot.config));
+    room.activePlayerId = snapshot.activePlayerId;
+    room.activeLetter = snapshot.activeLetter;
+    room.awaitingPasapalabraDecision = snapshot.awaitingPasapalabraDecision;
+    room.characterAnimation = snapshot.characterAnimation;
+    room.cameraShot = snapshot.cameraShot;
+    room.revealedAnswerForQuestionId = snapshot.revealedAnswerForQuestionId;
+    room.revealedExplanationForQuestionId = snapshot.revealedExplanationForQuestionId;
+
+    room.playerTokens.clear();
+    room.tokenToPlayerId.clear();
+    for (const [playerId, token] of snapshot.playerTokenEntries || []) {
+      room.playerTokens.set(playerId, token);
+      room.tokenToPlayerId.set(token, playerId);
+    }
+
+    room.processedActionIds.clear();
+    for (const actionId of snapshot.processedActionIds || []) {
+      room.processedActionIds.add(actionId);
+    }
+
+    room.contestants.clear();
+    for (const c of snapshot.contestants || []) {
+      room.contestants.set(c.id, JSON.parse(JSON.stringify(c)));
+    }
+
+    room.roundQuestions = JSON.parse(JSON.stringify(snapshot.roundQuestions));
+    room.previouslyUsedQuestionIds = new Set(snapshot.previouslyUsedQuestionIds || []);
+    room.customQuestionBank = JSON.parse(JSON.stringify(snapshot.customQuestionBank || []));
+    room.auditLog = JSON.parse(JSON.stringify(snapshot.auditLog || []));
+    room.lastUndoSnapshot = snapshot.lastUndoSnapshot
+      ? JSON.parse(JSON.stringify(snapshot.lastUndoSnapshot))
+      : null;
+    room.lastEvent = snapshot.lastEvent ? JSON.parse(JSON.stringify(snapshot.lastEvent)) : null;
+    room.timerLastTickTimestamp = snapshot.timerLastTickTimestamp;
+    room.pastResults = JSON.parse(JSON.stringify(snapshot.pastResults || []));
+
+    return room;
+  }
+
+  public recordProcessedActions(actionIds: string[]): void {
+    for (const id of actionIds) {
+      if (id) {
+        this.processedActionIds.add(id);
+      }
+    }
+  }
+
+  public getPlayerToken(playerId: string): string | null {
+    return this.playerTokens.get(playerId) ?? null;
+  }
+
+  public getAllContestantsSnapshot(): ContestantState[] {
+    return Array.from(this.contestants.values()).map((c) => JSON.parse(JSON.stringify(c)));
+  }
+
+  public getRoundQuestions(): Record<RoscoLetter, PRLQuestion> {
+    return { ...this.roundQuestions };
+  }
+
+  public getAuditLog(): AuditEvent[] {
+    return [...this.auditLog];
   }
 
   // ==========================================================================
@@ -209,7 +374,7 @@ export class AuthoritativeRoscoRoom {
     playerId?: string;
     playerToken?: string;
     now?: number;
-  }): { playerId: string; playerToken: string; contestant: ContestantState } {
+  }): { playerId: string; playerToken: string; contestant: ContestantState; isReconnection: boolean } {
     const now = params.now ?? Date.now();
     const cleanName = params.name.trim();
 
@@ -228,7 +393,12 @@ export class AuthoritativeRoscoRoom {
       if (existing && existing.status !== 'KICKED') {
         existing.isConnected = true;
         if (existing.status === 'DISCONNECTED') {
-          existing.status = this.activePlayerId === existing.id ? 'ACTIVE' : 'PAUSED';
+          existing.status =
+            this.status === 'WAITING'
+              ? 'WAITING'
+              : this.activePlayerId === existing.id
+              ? 'ACTIVE'
+              : 'PAUSED';
         }
         this.recordEvent(
           'PLAYER_RECONNECTED',
@@ -243,6 +413,7 @@ export class AuthoritativeRoscoRoom {
           playerId: existing.id,
           playerToken: params.playerToken,
           contestant: existing,
+          isReconnection: true,
         };
       }
     }
@@ -329,39 +500,57 @@ export class AuthoritativeRoscoRoom {
       now
     );
 
-    return { playerId, playerToken, contestant };
+    return { playerId, playerToken, contestant, isReconnection: false };
   }
 
-  public setContestantConnection(playerId: string, connected: boolean, now = Date.now()): void {
+  public setContestantConnection(playerId: string, connected: boolean, now = Date.now()): boolean {
     const player = this.contestants.get(playerId);
-    if (!player || player.status === 'KICKED') return;
+    if (!player || player.status === 'KICKED') return false;
+
+    const wasConnected = player.isConnected;
+    const pausedTimerOnDisconnect = !connected && this.activePlayerId === playerId && player.timer.isRunning;
 
     player.isConnected = connected;
     if (!connected) {
       // Si el jugador activo pierde conexión, pausamos su cronómetro para que no pierda segundos injustamente
-      if (this.activePlayerId === playerId && player.timer.isRunning) {
+      if (pausedTimerOnDisconnect) {
         this.syncActiveTimer(now);
         player.timer.isRunning = false;
       }
-      this.recordEvent(
-        'PLAYER_LEFT',
-        'CONTESTANT',
-        playerId,
-        null,
-        `${player.name} se ha desconectado temporalmente (su rosco y tiempo están a salvo)`,
-        false,
-        now
-      );
+      if (wasConnected || pausedTimerOnDisconnect) {
+        this.recordEvent(
+          'PLAYER_LEFT',
+          'CONTESTANT',
+          playerId,
+          null,
+          `${player.name} se ha desconectado temporalmente (su rosco y tiempo están a salvo)`,
+          false,
+          now
+        );
+      }
+      return wasConnected || pausedTimerOnDisconnect;
     } else {
-      this.recordEvent(
-        'PLAYER_RECONNECTED',
-        'CONTESTANT',
-        playerId,
-        null,
-        `${player.name} ha recuperado su conexión`,
-        false,
-        now
-      );
+      if (player.status === 'DISCONNECTED') {
+        player.status =
+          this.status === 'WAITING'
+            ? 'WAITING'
+            : this.activePlayerId === player.id
+            ? 'ACTIVE'
+            : 'PAUSED';
+      }
+      if (!wasConnected) {
+        this.recordEvent(
+          'PLAYER_RECONNECTED',
+          'CONTESTANT',
+          playerId,
+          null,
+          `${player.name} ha recuperado su conexión`,
+          false,
+          now
+        );
+        return true;
+      }
+      return false;
     }
   }
 
@@ -659,6 +848,7 @@ export class AuthoritativeRoscoRoom {
     }
 
     this.status = 'PLAYING';
+    this.roundStartedAt = now;
     this.awaitingPasapalabraDecision = false;
 
     // Registrar las 27 preguntas seleccionadas para no repetirlas en rondas consecutivas
@@ -1398,6 +1588,7 @@ export class AuthoritativeRoscoRoom {
 
   private handleResetRound(now: number): GameEventType {
     this.roundNumber += 1;
+    this.roundStartedAt = now;
     this.status = 'WAITING';
     this.activePlayerId = null;
     this.activeLetter = null;

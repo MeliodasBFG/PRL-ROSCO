@@ -1,0 +1,32 @@
+# ============================================================================
+# CONFIGURACIÓN INDEPENDIENTE DE CLOUDFLARE PARA PRL-ROSCO
+# NO reutiliza ni modifica ningún recurso del proyecto PRL-OCA
+# ============================================================================
+
+name = "prl-rosco-api"
+main = "worker/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+APP_NAME = "PRL-ROSCO"
+MAX_CONTESTANTS = "15"
+DEFAULT_TIMER_SECONDS = "120"
+
+# Base de datos D1 exclusiva para PRL-ROSCO
+[[d1_databases]]
+binding = "DB"
+database_name = "prl-rosco-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# Durable Objects exclusivos para salas de PRL-ROSCO
+[durable_objects]
+bindings = [
+  { name = "ROSCO_ROOMS", class_name = "RoscoRoomDO" }
+]
+
+[[migrations]]
+tag = "v1_prl_rosco_initial"
+new_sqlite_classes = ["RoscoRoomDO"]
